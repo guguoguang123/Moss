@@ -1,5 +1,6 @@
 # Large data files
 *.pkl
+*.pt
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
