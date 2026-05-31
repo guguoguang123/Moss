@@ -1,6 +1,15 @@
-'''
-this is a test file to test the code in the PyCode directory
-test git push whether it works or not
-begin test
-no device pattern
-'''
+"""
+MOSS 测试文件
+=============
+这是一个占位测试文件，用于验证 Git 推送是否正常工作。
+
+当前状态:
+  - 无实际测试用例
+  - 无设备检测逻辑
+  - 仅作为项目结构的占位符
+
+后续可在此文件中添加:
+  - 模型推理测试
+  - 数据加载测试
+  - 单元测试用例
+"""
