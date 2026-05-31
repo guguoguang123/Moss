@@ -20,13 +20,21 @@ class MOSSPyGDatasetBuilder:
         # 1. 建立节点映射 (GPU不认识字符串名字，只认识 0, 1, 2... 这样的整数索引)
         node_mapping = {node: i for i, node in enumerate(G.nodes())}
         
-        # 2. 提取特征张量 X (形状: [节点数, 4096])
+        # 2. 提取特征张量 X (形状: [节点数, 4096]) 以及 DFF 掩码
         x_list = []
+        is_dff_list = [] # 【新增】：用于记录每个节点是不是 DFF
+        
         for node in G.nodes():
-            # 抽出我们刚才辛辛苦苦注入的 4096 维特征
+            # 2.1 抽出我们刚才辛辛苦苦注入的 4096 维特征
             emb = G.nodes[node]['llm_embedding'] 
             x_list.append(emb)
+            
+            # 2.2 【新增】：判断当前节点是否为 DFF 触发器
+            node_type = G.nodes[node].get('node_type', '')
+            is_dff_list.append(1 if node_type == 'DFF' else 0)
+            
         x = torch.tensor(x_list, dtype=torch.float32)
+        is_dff = torch.tensor(is_dff_list, dtype=torch.bool) # 【新增】：转为布尔张量 (True/False)
         
         # 3. 提取连线张量 Edge_Index (形状: [2, 边数])
         # 将 ('wire_A', 'DFF_B') 转换成数字索引，比如 [ [0], [1] ]
@@ -39,7 +47,8 @@ class MOSSPyGDatasetBuilder:
         edge_index = torch.tensor([source_nodes, target_nodes], dtype=torch.long)
         
         # 4. 打包成 PyTorch Geometric 标准的数据对象
-        data = Data(x=x, edge_index=edge_index)
+        # 【修改】：将 is_dff 也打包进 Data 对象中，让 GPU 知道谁是触发器
+        data = Data(x=x, edge_index=edge_index, is_dff=is_dff) 
         return data
 
     def build_and_save(self):
@@ -50,12 +59,13 @@ class MOSSPyGDatasetBuilder:
         for module_name, G in dataset.items():
             pyg_data = self.convert_to_tensor(G)
             pyg_dataset.append(pyg_data)
-            print(f"  -> [转换成功] {module_name:<15} | 特征矩阵 X 形状: {list(pyg_data.x.shape)} | 连线矩阵 Edge 形状: {list(pyg_data.edge_index.shape)}")
+            # 【修改】：在打印日志中加入 is_dff 的形状展示，确认注入成功
+            print(f"  -> [转换成功] {module_name:<15} | X 形状: {list(pyg_data.x.shape)} | Edge 形状: {list(pyg_data.edge_index.shape)} | DFF 掩码: {list(pyg_data.is_dff.shape)}")
 
         # 将张量列表保存为 PyTorch 专用的 .pt 文件
         torch.save(pyg_dataset, self.output_pt_path)
         print("-" * 50)
-        print(f"[+] 数据已全部张量化 ")
+        print(f"[+] 数据已全部张量化，且物理状态掩码 (is_dff) 注入完毕！")
         print(f"[+] 张量数据集保存在: {self.output_pt_path}")
 
 if __name__ == "__main__":
